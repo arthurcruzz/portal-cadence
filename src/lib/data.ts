@@ -258,7 +258,9 @@ export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: strin
     porGrupo.set(chave, lista);
   }
 
-  const resultado: AutorizacaoDetalhe[] = [];
+  // Array intermediário com o campo extra de ordenação — removido no final,
+  // antes de retornar como AutorizacaoDetalhe[] "oficial".
+  const resultado: (AutorizacaoDetalhe & { _dataMaisRecente: number })[] = [];
 
   for (const [, linhasGrupo] of porGrupo) {
     // Mais recente primeiro dentro do grupo
