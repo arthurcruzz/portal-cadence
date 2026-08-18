@@ -70,7 +70,13 @@ export type AutorizacaoDetalhe = {
 // lerObras() dentro da mesma página, a planilha só é buscada uma vez.
 const lerObras = cache(async () => linhasParaObjetos(await getSheetRows("OBRAS")));
 const lerObrasTitulares = cache(async () => linhasParaObjetos(await getSheetRows("OBRAS_TITULARES")));
-const lerFonogramas = cache(async () => linhasParaObjetos(await getSheetRows("FONOGRAMAS")));
+// FONOGRAMAS tem uma linha de título decorativo antes do cabeçalho de
+// verdade — a linha 1 é só um título, o cabeçalho real está na linha 2.
+// Por isso pulamos a primeira linha antes de processar.
+const lerFonogramas = cache(async () => {
+  const linhas = await getSheetRows("FONOGRAMAS");
+  return linhasParaObjetos(linhas.slice(1));
+});
 const lerAutorizacoes = cache(async () => linhasParaObjetos(await getSheetRows("AUTORIZACOES")));
 const lerCompositoresClientes = cache(async () =>
   linhasParaObjetos(await getSheetRows("COMPOSITORES_CLIENTES"))
@@ -224,6 +230,8 @@ export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string)
       dataConsulta: f["DATA CONSULTA"],
     }));
 });
+
+
 
 export type ContagemStatus = { Original: number; Confirmado: number; Pendente: number; Descartado: number };
 export type ObraMonitorada = { nomeObra: string; contagem: ContagemStatus; total: number; fonogramas: Fonograma[] };
