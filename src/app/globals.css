@@ -288,6 +288,32 @@ body {
   color: var(--gold);
 }
 
+/* --- Tela de carregamento entre trocas de aba (loading.tsx) --- */
+.loading-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--navy);
+}
+
+.loading-wave {
+  width: 64px;
+  height: 32px;
+  animation: onda-pulsar 1.1s ease-in-out infinite;
+}
+
+@keyframes onda-pulsar {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
 .login-wrap {
   min-height: 100vh;
   display: flex;

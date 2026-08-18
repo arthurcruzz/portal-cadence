@@ -8,6 +8,7 @@
 
 import { getSheetRows } from "./sheetsClient";
 import { linhasParaObjetos, paraNumero } from "./sheetUtils";
+import { cache } from "react";
 
 export type ContatoCliente = {
   codigoTitularEcad: string;
@@ -65,24 +66,23 @@ export type AutorizacaoDetalhe = {
 // se o tráfego crescer, vale adicionar cache manual com um TTL curto).
 // ---------------------------------------------------------------------------
 
-async function lerObras() {
-  return linhasParaObjetos(await getSheetRows("OBRAS"));
-}
-async function lerObrasTitulares() {
-  return linhasParaObjetos(await getSheetRows("OBRAS_TITULARES"));
-}
-async function lerFonogramas() {
-  return linhasParaObjetos(await getSheetRows("FONOGRAMAS"));
-}
-async function lerAutorizacoes() {
-  return linhasParaObjetos(await getSheetRows("AUTORIZACOES"));
-}
-async function lerCompositoresClientes() {
-  return linhasParaObjetos(await getSheetRows("COMPOSITORES_CLIENTES"));
-}
+// React cache() memoiza por requisição — mesmo que várias funções chamem
+// lerObras() dentro da mesma página, a planilha só é buscada uma vez.
+const lerObras = cache(async () => linhasParaObjetos(await getSheetRows("OBRAS")));
+const lerObrasTitulares = cache(async () => linhasParaObjetos(await getSheetRows("OBRAS_TITULARES")));
+const lerFonogramas = cache(async () => linhasParaObjetos(await getSheetRows("FONOGRAMAS")));
+const lerAutorizacoes = cache(async () => linhasParaObjetos(await getSheetRows("AUTORIZACOES")));
+const lerCompositoresClientes = cache(async () =>
+  linhasParaObjetos(await getSheetRows("COMPOSITORES_CLIENTES"))
+);
 
 function normalizaTitulo(s: string): string {
-  return (s ?? "").trim().toUpperCase();
+  return (s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos (á→a, ã→a, ç→c...)
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, " "); // colapsa espaços duplos
 }
 
 function mapStatusCadastro(valor: string): "Cadastrado" | "Em andamento" | "Não cadastrado" {
@@ -127,7 +127,7 @@ export async function findContatoByCodigo(codigo: string): Promise<ContatoClient
 // OBRAS (+ coautores/percentual via OBRAS_TITULARES)
 // ---------------------------------------------------------------------------
 
-export async function getObrasDoCompositor(codigoTitularEcad: string): Promise<Obra[]> {
+export const getObrasDoCompositor = cache(async (codigoTitularEcad: string): Promise<Obra[]> => {
   const [obras, titulares, clientes] = await Promise.all([
     lerObras(),
     lerObrasTitulares(),
@@ -165,13 +165,13 @@ export async function getObrasDoCompositor(codigoTitularEcad: string): Promise<O
         compositores: compositoresDaObra,
       };
     });
-}
+});
 
 // ---------------------------------------------------------------------------
 // FONOGRAMAS (monitoramento)
 // ---------------------------------------------------------------------------
 
-export async function getFonogramasDoCompositor(codigoTitularEcad: string): Promise<Fonograma[]> {
+export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string): Promise<Fonograma[]> => {
   const obras = await getObrasDoCompositor(codigoTitularEcad);
   const titulosNormalizados = new Set(obras.map((o) => normalizaTitulo(o.titulo)));
 
@@ -188,12 +188,12 @@ export async function getFonogramasDoCompositor(codigoTitularEcad: string): Prom
       status: (f.STATUS as Fonograma["status"]) || "Pendente",
       dataConsulta: f["DATA CONSULTA"],
     }));
-}
+});
 
 export type ContagemStatus = { Original: number; Confirmado: number; Pendente: number; Descartado: number };
 export type ObraMonitorada = { nomeObra: string; contagem: ContagemStatus; total: number; fonogramas: Fonograma[] };
 
-export async function getFonogramasAgrupadosPorObra(codigoTitularEcad: string): Promise<ObraMonitorada[]> {
+export const getFonogramasAgrupadosPorObra = cache(async (codigoTitularEcad: string): Promise<ObraMonitorada[]> => {
   const fonogramas = await getFonogramasDoCompositor(codigoTitularEcad);
   const porObra = new Map<string, Fonograma[]>();
 
@@ -210,15 +210,26 @@ export async function getFonogramasAgrupadosPorObra(codigoTitularEcad: string): 
       return { nomeObra, contagem, total: lista.length, fonogramas: lista };
     })
     .sort((a, b) => b.total - a.total);
+});
+
+// Converte "DD/MM/AAAA" em timestamp pra ordenar por data real (não por texto).
+function parseDataBR(data: string | undefined): number {
+  if (!data) return 0;
+  const [d, m, a] = data.split("/").map((v) => parseInt(v, 10));
+  if (!d || !m || !a) return 0;
+  return new Date(a, m - 1, d).getTime();
 }
 
 // ---------------------------------------------------------------------------
 // AUTORIZAÇÕES — agora 1 linha por autor Cadence (ajustado pelo Arthur).
 // Agrupamos por (TÍTULO_OBRA + INTÉRPRETE); cada linha do grupo é 1 coautor.
+// Quando existem várias liberações ao longo do tempo pro mesmo autor, só a
+// mais recente vira o "status atual" — o resto fica de fora por enquanto
+// (histórico completo fica pra uma próxima versão).
 // Coautores não administrados vêm de OBRAS_TITULARES, sem status de assinatura.
 // ---------------------------------------------------------------------------
 
-export async function getAutorizacoesDoCompositor(codigoTitularEcad: string): Promise<AutorizacaoDetalhe[]> {
+export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: string): Promise<AutorizacaoDetalhe[]> => {
   const [autorizacoes, titulares, obras, clientes] = await Promise.all([
     lerAutorizacoes(),
     lerObrasTitulares(),
@@ -249,21 +260,32 @@ export async function getAutorizacoesDoCompositor(codigoTitularEcad: string): Pr
 
   const resultado: AutorizacaoDetalhe[] = [];
 
-  for (const [, linhas] of porGrupo) {
+  for (const [, linhasGrupo] of porGrupo) {
+    // Mais recente primeiro dentro do grupo
+    const linhas = [...linhasGrupo].sort(
+      (a, b) => parseDataBR(b["DATA_LIBERAÇÃO"]) - parseDataBR(a["DATA_LIBERAÇÃO"])
+    );
+
     const primeira = linhas[0];
     const nomeObra = primeira["TÍTULO_OBRA"];
     const interprete = primeira["INTÉRPRETE"];
 
-    const assinaturas: AssinaturaCoautor[] = linhas.map((l) => {
+    // Se o mesmo autor tiver mais de uma liberação (renovação), fica só a
+    // mais recente — como já ordenamos por data, o primeiro encontro vale.
+    const autoresJaVistos = new Set<string>();
+    const assinaturas: AssinaturaCoautor[] = [];
+    for (const l of linhas) {
+      if (autoresJaVistos.has(l.AUTOR_AUTORIZACAO)) continue;
+      autoresJaVistos.add(l.AUTOR_AUTORIZACAO);
       const assinado = (l.ASSINATURA ?? "").trim().toUpperCase() === "OK";
-      return {
+      assinaturas.push({
         codigo: l.AUTOR_AUTORIZACAO,
         nome: codigoParaNome.get(l.AUTOR_AUTORIZACAO) ?? l.AUTOR_AUTORIZACAO,
         status: assinado ? "Assinado" : "Aguardando assinatura",
         data: l["DATA_LIBERAÇÃO"] || null,
         documentoUrl: assinado ? l.LINK_CONTRATO_PDF || null : null,
-      };
-    });
+      });
+    }
 
     const codigosNaAutorizacao = new Set(linhas.map((l) => l.AUTOR_AUTORIZACAO));
     const codObra = tituloParaCodObra.get(normalizaTitulo(nomeObra));
@@ -280,8 +302,12 @@ export async function getAutorizacoesDoCompositor(codigoTitularEcad: string): Pr
       coautoresExternos,
       ecad: mapStatusCadastro(primeira.CADASTRO_ECAD),
       digital: mapStatusCadastro(primeira.CADASTRO_DIGITAL),
+      _dataMaisRecente: parseDataBR(primeira["DATA_LIBERAÇÃO"]),
     });
   }
 
-  return resultado;
-}
+  // Obras com atividade mais recente aparecem primeiro na lista.
+  return resultado
+    .sort((a, b) => b._dataMaisRecente - a._dataMaisRecente)
+    .map(({ _dataMaisRecente, ...resto }) => resto);
+});

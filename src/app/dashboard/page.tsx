@@ -28,7 +28,7 @@ export default async function DashboardPage() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 32 }} />
+        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 48 }} />
         <form action="/api/auth/logout" method="post">
           <button
             style={{ background: "transparent", border: "none", color: "var(--muted)", fontSize: 11, cursor: "pointer" }}

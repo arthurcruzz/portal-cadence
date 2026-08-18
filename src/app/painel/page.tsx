@@ -13,7 +13,7 @@ export default async function PainelPage() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 32 }} />
+        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 48 }} />
         <img src="/onda-branca.png" alt="" style={{ height: 14, opacity: 0.5 }} />
       </div>
 

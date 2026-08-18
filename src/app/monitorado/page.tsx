@@ -13,7 +13,7 @@ export default async function MonitoradoPage() {
   return (
     <div className="app-shell">
       <div className="topbar">
-        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 32 }} />
+        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 48 }} />
       </div>
 
       <div className="content">

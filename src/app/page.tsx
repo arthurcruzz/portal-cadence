@@ -8,9 +8,6 @@ const MENSAGENS_ERRO: Record<string, string> = {
   "falha-login": "Não foi possível entrar agora. Tente novamente em instantes.",
 };
 
-
-
-
 export default function LoginPage({
   searchParams,
 }: {
@@ -23,7 +20,7 @@ export default function LoginPage({
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <img src="/cadence-logo.png" alt="Cadence" style={{ height: 48, marginBottom: 10 }} />
+        <img src="/cadence-logo.png" alt="Cadence" style={{ width: 220, marginBottom: 4 }} />
         <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 24 }}>Portal Cadence</div>
 
         <a href="/api/auth/google/start" className="google-btn">
