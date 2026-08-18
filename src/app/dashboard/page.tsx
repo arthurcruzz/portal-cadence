@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessaoAtual } from "@/lib/auth";
 import {
-  getObrasDoCompositor,
   getFonogramasDoCompositor,
+  getFonogramasAgrupadosPorObra,
   getAutorizacoesDoCompositor,
 } from "@/lib/data";
 import TabBar from "@/components/TabBar";
@@ -13,9 +13,9 @@ export default async function DashboardPage() {
   if (!sessao) redirect("/");
 
   const codigo = sessao.contato.codigoTitularEcad;
-  const [obras, fonogramas, autorizacoes] = await Promise.all([
-    getObrasDoCompositor(codigo),
+  const [fonogramas, obrasAgrupadas, autorizacoes] = await Promise.all([
     getFonogramasDoCompositor(codigo),
+    getFonogramasAgrupadosPorObra(codigo),
     getAutorizacoesDoCompositor(codigo),
   ]);
 
@@ -24,6 +24,17 @@ export default async function DashboardPage() {
   ).length;
   const novasDescobertas = fonogramas.filter((f) => f.status === "Pendente");
   const confirmadas = fonogramas.filter((f) => f.status === "Confirmado" || f.status === "Original");
+
+  // Card principal: quantidade de OBRAS com pelo menos 1 fonograma encontrado
+  // (agrupado, igual à aba Monitorado) — não a contagem crua de linhas.
+  const totalObrasMonitoradas = obrasAgrupadas.length;
+
+  // Só conta Original + Confirmado — Pendente e Descartado ainda não são
+  // certeza, então não entram nesse número de destaque.
+  const totalFonogramasConfirmados = obrasAgrupadas.reduce(
+    (soma, o) => soma + o.contagem.Original + o.contagem.Confirmado,
+    0
+  );
 
   return (
     <div className="app-shell">
@@ -46,8 +57,10 @@ export default async function DashboardPage() {
 
         <div className="hero-card">
           <div className="hero-eyebrow">Catálogo monitorado</div>
-          <div className="hero-num">{fonogramas.length}</div>
-          <div className="hero-sub">fonogramas encontrados em {obras.length} obras</div>
+          <div className="hero-num">{totalObrasMonitoradas}</div>
+          <div className="hero-sub">
+            {totalFonogramasConfirmados} fonogramas encontrados nessas obras
+          </div>
         </div>
 
         <div className="stat-row">
