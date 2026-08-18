@@ -1,0 +1,12 @@
+{
+  "name": "Portal Cadence",
+  "short_name": "Cadence",
+  "description": "Portal Cadence — Gestão de Direitos Autorais",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0E1A2B",
+  "theme_color": "#0E1A2B",
+  "icons": [
+    { "src": "/icone-app.png", "sizes": "240x240", "type": "image/png" }
+  ]
+}
