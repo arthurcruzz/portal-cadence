@@ -125,6 +125,11 @@ export async function findContatoByCodigo(codigo: string): Promise<ContatoClient
 
 // ---------------------------------------------------------------------------
 // OBRAS (+ coautores/percentual via OBRAS_TITULARES)
+//
+// IMPORTANTE: agrupamos por TÍTULO normalizado, não por código ECAD. A mesma
+// música pode ter mais de um código ao longo do tempo (ex: renovações que
+// geram um novo código provisório "AGUARDANDO-xxx" a cada solicitação) — se
+// agrupássemos por código, a mesma música apareceria várias vezes.
 // ---------------------------------------------------------------------------
 
 export const getObrasDoCompositor = cache(async (codigoTitularEcad: string): Promise<Obra[]> => {
@@ -135,45 +140,75 @@ export const getObrasDoCompositor = cache(async (codigoTitularEcad: string): Pro
   ]);
 
   const codigosClientes = new Set(clientes.map((c) => c.CODIGO_TITULAR_ECAD));
+  const obraPorCodigo = new Map(obras.map((o) => [o.COD_OBRA_ECAD, o]));
 
-  // Códigos de obra em que esse compositor aparece como titular
-  const codigosObraDoCompositor = new Set(
-    titulares.filter((t) => t.CODIGO_TITULAR_ECAD === codigoTitularEcad).map((t) => t.COD_OBRA_ECAD)
-  );
+  const titularesDoCompositor = titulares.filter((t) => t.CODIGO_TITULAR_ECAD === codigoTitularEcad);
 
-  return obras
-    .filter((o) => codigosObraDoCompositor.has(o.COD_OBRA_ECAD))
-    .map((o) => {
-      const compositoresDaObra = titulares
-        .filter((t) => t.COD_OBRA_ECAD === o.COD_OBRA_ECAD)
-        .map((t) => ({
+  // Agrupa as linhas de titularidade desse compositor por título normalizado
+  const porTitulo = new Map<string, typeof titularesDoCompositor>();
+  for (const t of titularesDoCompositor) {
+    const chave = normalizaTitulo(t.TITULO_OBRA);
+    const lista = porTitulo.get(chave) ?? [];
+    lista.push(t);
+    porTitulo.set(chave, lista);
+  }
+
+  const resultado: Obra[] = [];
+
+  for (const [, linhas] of porTitulo) {
+    // Entre os códigos possíveis pra essa música, prefere um código ECAD
+    // numérico (confirmado) a um provisório ("AGUARDANDO-xxx").
+    const codigosPossiveis = Array.from(new Set(linhas.map((l) => l.COD_OBRA_ECAD)));
+    const codigoEscolhido =
+      codigosPossiveis.find((c) => /^\d+$/.test(c)) ?? codigosPossiveis[0];
+
+    const linhaBase = linhas.find((l) => l.COD_OBRA_ECAD === codigoEscolhido) ?? linhas[0];
+    const obraNaTabela = obraPorCodigo.get(codigoEscolhido);
+
+    // Todos os coautores dessa música (qualquer código associado a ela)
+    const compositoresDaObra = titulares
+      .filter((t) => codigosPossiveis.includes(t.COD_OBRA_ECAD))
+      .reduce((acc, t) => {
+        if (acc.some((c) => c.codigo === t.CODIGO_TITULAR_ECAD)) return acc; // já entrou
+        acc.push({
           codigo: t.CODIGO_TITULAR_ECAD,
           nome: t.NOME_TITULAR,
           percentual: paraNumero(t.PERCENTUAL),
           ehClienteCadence: codigosClientes.has(t.CODIGO_TITULAR_ECAD),
-        }));
+        });
+        return acc;
+      }, [] as Compositor[]);
 
-      // ⚠️ ASSUMIDO: código ECAD numérico = confirmado; texto (ex: "AGUARDANDO-xxx") = provisório.
-      // Confirmar com o Arthur se esse é de fato o critério certo.
-      const statusEcad: Obra["statusEcad"] = /^\d+$/.test(o.COD_OBRA_ECAD) ? "Confirmado" : "Provisório";
+    // ⚠️ ASSUMIDO: código ECAD numérico = confirmado; texto (ex: "AGUARDANDO-xxx") = provisório.
+    const statusEcad: Obra["statusEcad"] = /^\d+$/.test(codigoEscolhido) ? "Confirmado" : "Provisório";
 
-      return {
-        codObraEcad: o.COD_OBRA_ECAD,
-        titulo: o["TÍTULO DA OBRA"],
-        situacao: o.SITUACAO,
-        statusEcad,
-        compositores: compositoresDaObra,
-      };
+    resultado.push({
+      codObraEcad: codigoEscolhido,
+      titulo: obraNaTabela?.["TÍTULO DA OBRA"] ?? linhaBase.TITULO_OBRA,
+      situacao: obraNaTabela?.SITUACAO ?? "",
+      statusEcad,
+      compositores: compositoresDaObra,
     });
+  }
+
+  return resultado;
 });
 
 // ---------------------------------------------------------------------------
 // FONOGRAMAS (monitoramento)
+//
+// Cruza direto com OBRAS_TITULARES (TITULO_OBRA), sem depender do elo com a
+// tabela OBRAS — assim, mesmo que uma obra não tenha código ECAD linkado
+// corretamente na tabela OBRAS, seus fonogramas ainda aparecem.
 // ---------------------------------------------------------------------------
 
 export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string): Promise<Fonograma[]> => {
-  const obras = await getObrasDoCompositor(codigoTitularEcad);
-  const titulosNormalizados = new Set(obras.map((o) => normalizaTitulo(o.titulo)));
+  const titulares = await lerObrasTitulares();
+  const titulosNormalizados = new Set(
+    titulares
+      .filter((t) => t.CODIGO_TITULAR_ECAD === codigoTitularEcad)
+      .map((t) => normalizaTitulo(t.TITULO_OBRA))
+  );
 
   const fonogramas = await lerFonogramas();
 
@@ -230,10 +265,9 @@ function parseDataBR(data: string | undefined): number {
 // ---------------------------------------------------------------------------
 
 export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: string): Promise<AutorizacaoDetalhe[]> => {
-  const [autorizacoes, titulares, obras, clientes] = await Promise.all([
+  const [autorizacoes, titulares, clientes] = await Promise.all([
     lerAutorizacoes(),
     lerObrasTitulares(),
-    lerObras(),
     lerCompositoresClientes(),
   ]);
 
@@ -245,9 +279,6 @@ export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: strin
       .filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad)
       .map((a) => `${normalizaTitulo(a["TÍTULO_OBRA"])}|||${a["INTÉRPRETE"]}`)
   );
-
-  // Título → código de obra, pra cruzar com OBRAS_TITULARES (coautores externos)
-  const tituloParaCodObra = new Map(obras.map((o) => [normalizaTitulo(o["TÍTULO DA OBRA"]), o.COD_OBRA_ECAD]));
 
   const porGrupo = new Map<string, typeof autorizacoes>();
   for (const a of autorizacoes) {
@@ -290,12 +321,21 @@ export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: strin
     }
 
     const codigosNaAutorizacao = new Set(linhas.map((l) => l.AUTOR_AUTORIZACAO));
-    const codObra = tituloParaCodObra.get(normalizaTitulo(nomeObra));
-    const coautoresExternos = codObra
-      ? titulares
-          .filter((t) => t.COD_OBRA_ECAD === codObra && !codigosNaAutorizacao.has(t.CODIGO_TITULAR_ECAD))
-          .map((t) => ({ nome: t.NOME_TITULAR, percentual: paraNumero(t.PERCENTUAL) }))
-      : [];
+    // Coautores externos: qualquer linha de OBRAS_TITULARES com o mesmo
+    // título (comparado sem acento/maiúsculas) que não está entre quem já
+    // aparece nessa autorização.
+    const tituloNormalizadoObra = normalizaTitulo(nomeObra);
+    const coautoresExternos = titulares
+      .filter(
+        (t) =>
+          normalizaTitulo(t.TITULO_OBRA) === tituloNormalizadoObra &&
+          !codigosNaAutorizacao.has(t.CODIGO_TITULAR_ECAD)
+      )
+      .reduce((acc, t) => {
+        if (acc.some((c) => c.nome === t.NOME_TITULAR)) return acc;
+        acc.push({ nome: t.NOME_TITULAR, percentual: paraNumero(t.PERCENTUAL) });
+        return acc;
+      }, [] as { nome: string; percentual: number }[]);
 
     resultado.push({
       nomeObra,
