@@ -41,6 +41,7 @@ export type Fonograma = {
   ano: string;
   status: "Pendente" | "Confirmado" | "Descartado" | "Original";
   dataConsulta: string;
+  linkSpotify: string;
 };
 
 export type AssinaturaCoautor = {
@@ -228,6 +229,7 @@ export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string)
       ano: f.ANO,
       status: (f.STATUS as Fonograma["status"]) || "Pendente",
       dataConsulta: f["DATA CONSULTA"],
+      linkSpotify: f["LINK SPOTIFY"],
     }));
 });
 

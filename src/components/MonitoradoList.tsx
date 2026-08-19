@@ -97,6 +97,28 @@ export default function MonitoradoList({ obras }: { obras: ObraMonitorada[] }) {
                             {f.dataConsulta ? `Encontrado em ${f.dataConsulta}` : ""}
                           </div>
                         )}
+                        {f.status === "Original" ? (
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3 }}>
+                            ISRC {f.isrc}
+                            {f.linkSpotify && (
+                              <>
+                                {" · "}
+                                <a
+                                  href={f.linkSpotify}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: "var(--gold-soft)", textDecoration: "underline" }}
+                                >
+                                  Ouvir no Spotify
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3, fontStyle: "italic" }}>
+                            Detalhes completos disponíveis na gestão Cadence
+                          </div>
+                        )}
                       </div>
                       <span className={`badge ${badgeClasse(f.status)}`}>
                         {f.status === "Original" ? "⭐ " : ""}
