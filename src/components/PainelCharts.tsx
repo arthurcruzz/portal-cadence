@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { ObraMonitorada } from "@/lib/data";
+import PotencialNaoCapturado from "./PotencialNaoCapturado";
 
 const CORES_STATUS: Record<string, string> = {
   Original: "#2E6E8E",
@@ -65,6 +66,8 @@ export default function PainelCharts({ obras }: { obras: ObraMonitorada[] }) {
 
   return (
     <>
+      <PotencialNaoCapturado obras={obras} />
+
       <div className="filter-row">
         {opcoes.map((op) => (
           <div

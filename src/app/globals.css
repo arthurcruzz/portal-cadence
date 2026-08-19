@@ -197,6 +197,69 @@ body {
   color: var(--muted);
 }
 
+/* Card de alerta/potencial (âmbar) — usado no Painel */
+.potencial-card {
+  background: linear-gradient(135deg, rgba(201, 162, 75, 0.14), rgba(201, 162, 75, 0.05));
+  border: 1px solid rgba(201, 162, 75, 0.35);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.potencial-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.potencial-valor {
+  font-family: "Fraunces", serif;
+  font-size: 38px;
+  font-weight: 600;
+  margin: 6px 0 2px;
+  color: #fff;
+}
+
+.potencial-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.potencial-texto {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.potencial-toggle {
+  font-size: 11px;
+  color: var(--gold-soft);
+  margin-top: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.potencial-detalhe {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(201, 162, 75, 0.25);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.potencial-detalhe strong {
+  color: #fff;
+}
+
 .status-card {
   background: var(--navy-2);
   border: 1px solid var(--line);

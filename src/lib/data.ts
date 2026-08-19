@@ -42,6 +42,7 @@ export type Fonograma = {
   status: "Pendente" | "Confirmado" | "Descartado" | "Original";
   dataConsulta: string;
   linkSpotify: string;
+  plays: number | null; // preenchido pelo script scraper-plays-spotify; null = ainda não processado
 };
 
 export type AssinaturaCoautor = {
@@ -230,6 +231,7 @@ export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string)
       status: (f.STATUS as Fonograma["status"]) || "Pendente",
       dataConsulta: f["DATA CONSULTA"],
       linkSpotify: f["LINK SPOTIFY"],
+      plays: f["PLAYS_SPOTIFY"] && f["PLAYS_SPOTIFY"].trim() !== "" ? parseInt(f["PLAYS_SPOTIFY"], 10) : null,
     }));
 });
 

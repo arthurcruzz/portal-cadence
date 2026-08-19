@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export default function CountUp({ value, duracaoMs = 700 }: { value: number; duracaoMs?: number }) {
+export default function CountUp({
+  value,
+  duracaoMs = 700,
+  formatador,
+}: {
+  value: number;
+  duracaoMs?: number;
+  formatador?: (n: number) => string;
+}) {
   const [exibido, setExibido] = useState(0);
   const inicioRef = useRef<number | null>(null);
 
@@ -27,5 +35,5 @@ export default function CountUp({ value, duracaoMs = 700 }: { value: number; dur
     return () => cancelAnimationFrame(frameId);
   }, [value, duracaoMs]);
 
-  return <>{exibido}</>;
+  return <>{formatador ? formatador(exibido) : exibido}</>;
 }
