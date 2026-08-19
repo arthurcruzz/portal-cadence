@@ -52,8 +52,12 @@ export default function PainelCharts({ obras }: { obras: ObraMonitorada[] }) {
   const dadosRanking = useMemo(
     () =>
       [...obras]
-        .sort((a, b) => b.total - a.total)
-        .map((o) => ({ nome: o.nomeObra.length > 14 ? o.nomeObra.slice(0, 13) + "…" : o.nomeObra, total: o.total })),
+        .map((o) => ({
+          nome: o.nomeObra.length > 14 ? o.nomeObra.slice(0, 13) + "…" : o.nomeObra,
+          // Só Original + Confirmado — Pendente/Descartado ainda não são certeza.
+          total: o.contagem.Original + o.contagem.Confirmado,
+        }))
+        .sort((a, b) => b.total - a.total),
     [obras]
   );
 

@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getSessaoAtual } from "@/lib/auth";
 import { getFonogramasAgrupadosPorObra } from "@/lib/data";
 import TabBar from "@/components/TabBar";
 import MonitoradoList from "@/components/MonitoradoList";
+import LoadingWave from "@/components/LoadingWave";
 
 export default async function MonitoradoPage() {
   const sessao = await getSessaoAtual();
@@ -21,7 +23,9 @@ export default async function MonitoradoPage() {
           Gravações encontradas pelo monitoramento, agrupadas por obra — tabela Fonogramas.
         </div>
 
-        <MonitoradoList obras={obrasAgrupadas} />
+        <Suspense fallback={<LoadingWave />}>
+          <MonitoradoList obras={obrasAgrupadas} />
+        </Suspense>
       </div>
 
       <TabBar />

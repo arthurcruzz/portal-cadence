@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ObraMonitorada } from "@/lib/data";
 
 function badgeClasse(status: string) {
-  if (status === "Pendente" || status === "Descartado") return "wait";
-  return "new";
+  if (status === "Original") return "status-original";
+  if (status === "Confirmado") return "status-confirmado";
+  if (status === "Pendente") return "status-pendente";
+  return "status-descartado";
 }
 
 function iniciais(nome: string) {
@@ -21,7 +24,15 @@ function ContagemLine({ contagem }: { contagem: ObraMonitorada["contagem"] }) {
 }
 
 export default function MonitoradoList({ obras }: { obras: ObraMonitorada[] }) {
-  const [aberta, setAberta] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const obraDaUrl = searchParams.get("obra");
+  const [aberta, setAberta] = useState<string | null>(obraDaUrl);
+
+  // Se chegou por link com ?obra=..., garante que abre mesmo se o estado
+  // inicial não tiver pego a tempo (navegação client-side entre páginas).
+  useEffect(() => {
+    if (obraDaUrl) setAberta(obraDaUrl);
+  }, [obraDaUrl]);
 
   if (obras.length === 0) {
     return <div style={{ color: "var(--muted)", fontSize: 12.5 }}>Nenhum fonograma monitorado ainda.</div>;
@@ -32,7 +43,7 @@ export default function MonitoradoList({ obras }: { obras: ObraMonitorada[] }) {
       {obras.map((o) => {
         const expandido = aberta === o.nomeObra;
         return (
-          <div key={o.nomeObra}>
+          <div key={o.nomeObra} id={`obra-${encodeURIComponent(o.nomeObra)}`}>
             <div
               className="row-card"
               style={{ cursor: "pointer", alignItems: "flex-start" }}
@@ -77,8 +88,20 @@ export default function MonitoradoList({ obras }: { obras: ObraMonitorada[] }) {
                       >
                         {iniciais(f.interprete)}
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 0 }}>{f.interprete}</div>
-                      <span className={`badge ${badgeClasse(f.status)}`}>{f.status}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600 }}>{f.interprete}</div>
+                        {(f.ano || f.dataConsulta) && (
+                          <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 1 }}>
+                            {f.ano ? `Ano ${f.ano}` : ""}
+                            {f.ano && f.dataConsulta ? " · " : ""}
+                            {f.dataConsulta ? `Encontrado em ${f.dataConsulta}` : ""}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`badge ${badgeClasse(f.status)}`}>
+                        {f.status === "Original" ? "⭐ " : ""}
+                        {f.status}
+                      </span>
                     </div>
                   ))}
                 </div>
