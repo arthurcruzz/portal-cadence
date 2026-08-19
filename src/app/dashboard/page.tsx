@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   );
 
   const mensagemWhatsapp = encodeURIComponent(
-    `Oi! Pra formalizar a autorização/documentação da música, preenche esse formulário: ${LINK_SOLICITACAO}`
+    `Oi! Minhas obras são administradas pela Cadence. Pra solicitar a documentação de autorização, é só preencher o formulário neste link: ${LINK_SOLICITACAO}\n\nO documento chega direto no e-mail que você informar.\n\nQualquer dúvida, tem um WhatsApp de contato disponível ali no próprio link. 🎵`
   );
 
   return (
