@@ -315,6 +315,28 @@ function extrairMeses(periodo: string): number | null {
 // e a lista de exclusividades ativas (independente do ano) + liberações do
 // ano. Só os contratos em que esse compositor é o autor da autorização.
 // ---------------------------------------------------------------------------
+// DIAGNÓSTICO TEMPORÁRIO — remove depois de resolver o bug do "tudo zerado".
+export const getDiagnosticoVendas = cache(async (codigoTitularEcad: string) => {
+  const autorizacoes = await lerAutorizacoes();
+  const doCompositor = autorizacoes.filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad);
+  const comValor = doCompositor.filter((a) => paraNumero(a.VALOR) > 0);
+
+  return {
+    totalLinhasAutorizacoes: autorizacoes.length,
+    codigoUsado: codigoTitularEcad,
+    linhasDoCompositor: doCompositor.length,
+    linhasComValorMaiorQueZero: comValor.length,
+    amostra: comValor.slice(0, 8).map((a) => ({
+      obra: a["TÍTULO_OBRA"],
+      tipoLiberacaoRaw: a["TIPO_LIBERAÇÃO"],
+      valorRaw: a.VALOR,
+      valorParseado: paraNumero(a.VALOR),
+      dataLiberacaoRaw: a["DATA_LIBERAÇÃO"],
+      periodoRaw: a["PERÍODO"],
+    })),
+  };
+});
+
 export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Promise<ResumoVendas> => {
   const autorizacoes = await lerAutorizacoes();
   const hoje = new Date();
