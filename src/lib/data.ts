@@ -231,7 +231,12 @@ export const getFonogramasDoCompositor = cache(async (codigoTitularEcad: string)
       status: (f.STATUS as Fonograma["status"]) || "Pendente",
       dataConsulta: f["DATA CONSULTA"],
       linkSpotify: f["LINK SPOTIFY"],
-      plays: f["PLAYS_SPOTIFY"] && f["PLAYS_SPOTIFY"].trim() !== "" ? parseInt(f["PLAYS_SPOTIFY"], 10) : null,
+      plays: (() => {
+        const bruto = (f["PLAYS_SPOTIFY"] ?? "").trim();
+        if (bruto === "" || bruto === "N/D") return null; // vazio = ainda não processado; N/D = Spotify não expõe esse número
+        const n = parseInt(bruto, 10);
+        return isNaN(n) ? null : n;
+      })(),
     }));
 });
 
@@ -275,6 +280,105 @@ function parseDataBR(data: string | undefined): number {
 // (histórico completo fica pra uma próxima versão).
 // Coautores não administrados vêm de OBRAS_TITULARES, sem status de assinatura.
 // ---------------------------------------------------------------------------
+
+export type ContratoLiberacao = {
+  nomeObra: string;
+  interprete: string;
+  tipoLiberacao: string; // "Liberação" ou "Exclusividade"
+  valor: number;
+  dataLiberacao: string;
+  diasRestantes: number | null; // só preenchido pra Exclusividade
+};
+
+export type ResumoVendas = {
+  totalLiberacoes: number;
+  totalExclusividades: number;
+  totalGeral: number;
+  ano: number;
+  exclusividadesAtivas: ContratoLiberacao[]; // todas, independente do ano — ordenadas por vencer primeiro
+  liberacoesDoAno: ContratoLiberacao[];
+};
+
+function parseDataBRparaDate(data: string): Date | null {
+  const [d, m, a] = (data ?? "").split("/").map((v) => parseInt(v, 10));
+  if (!d || !m || !a) return null;
+  return new Date(a, m - 1, d);
+}
+
+function extrairMeses(periodo: string): number | null {
+  const match = (periodo ?? "").match(/(\d+)\s*MESES?/i);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+// ---------------------------------------------------------------------------
+// VENDAS — liberações e exclusividades: totais do ano corrente (por tipo),
+// e a lista de exclusividades ativas (independente do ano) + liberações do
+// ano. Só os contratos em que esse compositor é o autor da autorização.
+// ---------------------------------------------------------------------------
+export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Promise<ResumoVendas> => {
+  const autorizacoes = await lerAutorizacoes();
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+
+  const contratos: ContratoLiberacao[] = autorizacoes
+    .filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad)
+    .map((a) => {
+      const tipo = (a["TIPO_LIBERAÇÃO"] || "").trim();
+      const dataLiberacao = a["DATA_LIBERAÇÃO"] || "";
+      let diasRestantes: number | null = null;
+
+      if (tipo.toUpperCase().includes("EXCLUSIV")) {
+        const dataInicio = parseDataBRparaDate(dataLiberacao);
+        const meses = extrairMeses(a["PERÍODO"] || "");
+        if (dataInicio && meses !== null) {
+          const dataFim = new Date(dataInicio);
+          dataFim.setMonth(dataFim.getMonth() + meses);
+          diasRestantes = Math.ceil((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      return {
+        nomeObra: a["TÍTULO_OBRA"],
+        interprete: a["INTÉRPRETE"],
+        tipoLiberacao: tipo.toUpperCase().includes("EXCLUSIV") ? "Exclusividade" : "Liberação",
+        valor: paraNumero(a.VALOR),
+        dataLiberacao,
+        diasRestantes,
+      };
+    })
+    .filter((c) => c.valor > 0);
+
+  const doAnoAtual = contratos.filter((c) => {
+    const d = parseDataBRparaDate(c.dataLiberacao);
+    return d && d.getFullYear() === anoAtual;
+  });
+
+  const totalLiberacoes = doAnoAtual
+    .filter((c) => c.tipoLiberacao === "Liberação")
+    .reduce((soma, c) => soma + c.valor, 0);
+  const totalExclusividades = doAnoAtual
+    .filter((c) => c.tipoLiberacao === "Exclusividade")
+    .reduce((soma, c) => soma + c.valor, 0);
+
+  const exclusividadesAtivas = contratos
+    .filter((c) => c.tipoLiberacao === "Exclusividade" && c.diasRestantes !== null && c.diasRestantes >= 0)
+    .sort((a, b) => (a.diasRestantes ?? 0) - (b.diasRestantes ?? 0));
+
+  const liberacoesDoAno = doAnoAtual
+    .filter((c) => c.tipoLiberacao === "Liberação")
+    .sort((a, b) => (parseDataBRparaDate(b.dataLiberacao)?.getTime() ?? 0) - (parseDataBRparaDate(a.dataLiberacao)?.getTime() ?? 0));
+
+  return {
+    totalLiberacoes,
+    totalExclusividades,
+    totalGeral: totalLiberacoes + totalExclusividades,
+    ano: anoAtual,
+    exclusividadesAtivas,
+    liberacoesDoAno,
+  };
+});
+
+
 
 export const getAutorizacoesDoCompositor = cache(async (codigoTitularEcad: string): Promise<AutorizacaoDetalhe[]> => {
   const [autorizacoes, titulares, clientes] = await Promise.all([
