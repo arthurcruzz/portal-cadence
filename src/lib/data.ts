@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { getSheetRows } from "./sheetsClient";
-import { linhasParaObjetos, paraNumero } from "./sheetUtils";
+import { linhasParaObjetos, paraNumero, paraNumeroMoeda } from "./sheetUtils";
 import { cache } from "react";
 
 export type ContatoCliente = {
@@ -315,34 +315,6 @@ function extrairMeses(periodo: string): number | null {
 // e a lista de exclusividades ativas (independente do ano) + liberações do
 // ano. Só os contratos em que esse compositor é o autor da autorização.
 // ---------------------------------------------------------------------------
-// DIAGNÓSTICO TEMPORÁRIO — remove depois de resolver o bug do "tudo zerado".
-export const getDiagnosticoVendas = cache(async (codigoTitularEcad: string) => {
-  const autorizacoes = await lerAutorizacoes();
-  const doCompositor = autorizacoes.filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad);
-
-  // Amostra: só linhas que TÊM algo escrito no campo VALOR (mesmo que o
-  // parser não reconheça como número) — sem isso, a amostra pegaria só
-  // linhas antigas sem valor nenhum, que não ajudam a diagnosticar.
-  const comAlgumValorEscrito = doCompositor.filter((a) => (a.VALOR ?? "").toString().trim() !== "");
-  const amostraBruta = comAlgumValorEscrito.slice(0, 10).map((a) => ({
-    obra: a["TÍTULO_OBRA"],
-    valorRaw: a.VALOR,
-    valorTipo: typeof a.VALOR,
-    valorParseado: paraNumero(a.VALOR),
-  }));
-
-  const comValor = doCompositor.filter((a) => paraNumero(a.VALOR) > 0);
-
-  return {
-    totalLinhasAutorizacoes: autorizacoes.length,
-    codigoUsado: codigoTitularEcad,
-    linhasDoCompositor: doCompositor.length,
-    linhasComAlgumValorEscrito: comAlgumValorEscrito.length,
-    linhasComValorMaiorQueZero: comValor.length,
-    amostraBruta,
-  };
-});
-
 export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Promise<ResumoVendas> => {
   const autorizacoes = await lerAutorizacoes();
   const hoje = new Date();
@@ -372,7 +344,7 @@ export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Pr
         nomeObra: a["TÍTULO_OBRA"],
         interprete: a["INTÉRPRETE"],
         tipoLiberacao: ehExclusividade ? "Exclusividade" : "Liberação",
-        valor: paraNumero(a.VALOR),
+        valor: paraNumeroMoeda(a.VALOR),
         dataLiberacao,
         diasRestantes,
       };

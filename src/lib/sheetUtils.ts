@@ -22,3 +22,16 @@ export function paraNumero(valor: string | undefined): number {
   const n = parseFloat(normalizado);
   return isNaN(n) ? 0 : n;
 }
+
+// Interpreta valores em formato de moeda BR, ex: "R$  15.000,00" ou "R$  -"
+// (usado no campo VALOR de Autorizações — formato diferente de paraNumero,
+// que já é usado pro campo PERCENTUAL e não deve mudar).
+export function paraNumeroMoeda(valor: string | undefined): number {
+  if (!valor) return 0;
+  let s = valor.toString().trim();
+  s = s.replace(/R\$\s*/gi, "").trim();
+  if (s === "" || s === "-") return 0;
+  s = s.replace(/\./g, "").replace(",", "."); // remove ponto de milhar, vírgula vira decimal
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
