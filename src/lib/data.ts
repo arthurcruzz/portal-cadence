@@ -323,11 +323,14 @@ export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Pr
   const contratos: ContratoLiberacao[] = autorizacoes
     .filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad)
     .map((a) => {
-      const tipo = (a["TIPO_LIBERAÇÃO"] || "").trim();
+      const tipoRaw = (a["TIPO_LIBERAÇÃO"] || "").trim().toUpperCase();
+      // "SEM EXCLUSIVIDADE" contém a palavra "EXCLUSIV" — por isso checamos
+      // "SEM" primeiro. Só entra como Exclusividade se NÃO começar com "SEM".
+      const ehExclusividade = tipoRaw.includes("EXCLUSIV") && !tipoRaw.startsWith("SEM");
       const dataLiberacao = a["DATA_LIBERAÇÃO"] || "";
       let diasRestantes: number | null = null;
 
-      if (tipo.toUpperCase().includes("EXCLUSIV")) {
+      if (ehExclusividade) {
         const dataInicio = parseDataBRparaDate(dataLiberacao);
         const meses = extrairMeses(a["PERÍODO"] || "");
         if (dataInicio && meses !== null) {
@@ -340,13 +343,14 @@ export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Pr
       return {
         nomeObra: a["TÍTULO_OBRA"],
         interprete: a["INTÉRPRETE"],
-        tipoLiberacao: tipo.toUpperCase().includes("EXCLUSIV") ? "Exclusividade" : "Liberação",
+        tipoLiberacao: ehExclusividade ? "Exclusividade" : "Liberação",
         valor: paraNumero(a.VALOR),
         dataLiberacao,
         diasRestantes,
       };
     })
     .filter((c) => c.valor > 0);
+
 
   const doAnoAtual = contratos.filter((c) => {
     const d = parseDataBRparaDate(c.dataLiberacao);
