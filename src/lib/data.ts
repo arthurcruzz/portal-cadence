@@ -319,21 +319,27 @@ function extrairMeses(periodo: string): number | null {
 export const getDiagnosticoVendas = cache(async (codigoTitularEcad: string) => {
   const autorizacoes = await lerAutorizacoes();
   const doCompositor = autorizacoes.filter((a) => a.AUTOR_AUTORIZACAO === codigoTitularEcad);
+
+  // Amostra: só linhas que TÊM algo escrito no campo VALOR (mesmo que o
+  // parser não reconheça como número) — sem isso, a amostra pegaria só
+  // linhas antigas sem valor nenhum, que não ajudam a diagnosticar.
+  const comAlgumValorEscrito = doCompositor.filter((a) => (a.VALOR ?? "").toString().trim() !== "");
+  const amostraBruta = comAlgumValorEscrito.slice(0, 10).map((a) => ({
+    obra: a["TÍTULO_OBRA"],
+    valorRaw: a.VALOR,
+    valorTipo: typeof a.VALOR,
+    valorParseado: paraNumero(a.VALOR),
+  }));
+
   const comValor = doCompositor.filter((a) => paraNumero(a.VALOR) > 0);
 
   return {
     totalLinhasAutorizacoes: autorizacoes.length,
     codigoUsado: codigoTitularEcad,
     linhasDoCompositor: doCompositor.length,
+    linhasComAlgumValorEscrito: comAlgumValorEscrito.length,
     linhasComValorMaiorQueZero: comValor.length,
-    amostra: comValor.slice(0, 8).map((a) => ({
-      obra: a["TÍTULO_OBRA"],
-      tipoLiberacaoRaw: a["TIPO_LIBERAÇÃO"],
-      valorRaw: a.VALOR,
-      valorParseado: paraNumero(a.VALOR),
-      dataLiberacaoRaw: a["DATA_LIBERAÇÃO"],
-      periodoRaw: a["PERÍODO"],
-    })),
+    amostraBruta,
   };
 });
 
