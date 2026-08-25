@@ -1,3 +1,5 @@
+"use client";
+
 import type { ResumoVendas } from "@/lib/data";
 import CountUp from "@/components/CountUp";
 
