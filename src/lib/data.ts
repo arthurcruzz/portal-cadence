@@ -288,6 +288,7 @@ export type ContratoLiberacao = {
   valor: number;
   dataLiberacao: string;
   diasRestantes: number | null; // só preenchido pra Exclusividade
+  documentoUrl: string | null;
 };
 
 export type ResumoVendas = {
@@ -347,6 +348,7 @@ export const getVendasDoCompositor = cache(async (codigoTitularEcad: string): Pr
         valor: paraNumeroMoeda(a.VALOR),
         dataLiberacao,
         diasRestantes,
+        documentoUrl: a.LINK_CONTRATO_PDF || null,
       };
     })
     .filter((c) => c.valor > 0);
